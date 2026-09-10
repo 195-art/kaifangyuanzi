@@ -3,7 +3,6 @@ package org.example.kaifangyuanzi.exam.Q6;
 import java.util.*;
 
 public class OrderAnalyzer {
-
     private List<Order> orders = new ArrayList<>();
 
     public void add(Order order){
@@ -11,11 +10,8 @@ public class OrderAnalyzer {
     }
 
     public void removeInvalidOrders(){
-        for(Order order:orders){
-            if(order.getAmount() <= 0){
-                orders.remove(order);
-            }
-        }
+        // 修正：使用 removeIf 按条件删除，底层是迭代器实现，不会触发并发修改异常
+        orders.removeIf(order -> order.getAmount() <= 0);
     }
 
     public Set<String> getAllUniqueTags(){
@@ -65,11 +61,4 @@ public class OrderAnalyzer {
         Collections.sort(defaultSorted);
         defaultSorted.forEach(System.out::println);
     }
-
-
-
-
-
-
-
 }
