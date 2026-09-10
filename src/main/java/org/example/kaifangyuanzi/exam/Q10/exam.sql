@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS exam DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE exam;
+
+CREATE TABLE IF NOT EXISTS sys_user (
+    id            BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    username      VARCHAR(50) NOT NULL COMMENT '用户名',
+    password      VARCHAR(100) NOT NULL COMMENT '用户密码',
+    register_date DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册日期',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户认证模块表';
