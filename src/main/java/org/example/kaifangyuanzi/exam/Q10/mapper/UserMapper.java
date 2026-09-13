@@ -12,9 +12,7 @@ public interface UserMapper {
     SysUser selectByUsername(String username);
 
     @Insert("INSERT INTO sys_user (username, password) VALUES (#{username}, #{password})")
-
     @Options(useGeneratedKeys = true,keyProperty = "id")
     int insertUser(SysUser sysUser);
-
 
 }
