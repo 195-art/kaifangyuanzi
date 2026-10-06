@@ -1,0 +1,7 @@
+target
+.git
+.idea
+.env
+test_big_file.txt
+merged_file.txt
+split_parts

@@ -16,9 +16,9 @@ class LogisticsConfig{
 
 class VehicleFactory{
     public static TransportVehicle createVehicle(String type){
-        if(type.equals("Truck")){
+        if("Truck".equals(type)){
             return new Truck("T-998");
-        }else if(type.equals("Drone")){
+        }else if("Drone".equals(type)){
             return new  Drone("D-007");
         }
         return null;
@@ -28,9 +28,9 @@ class VehicleFactory{
 
 class LogisticsOrder{
     private String orderId;
-    private String sender;      // 寄件人
-    private String receiver;    // 收件人
-    private boolean isFragile;  // 是否易碎品
+    private String sender;
+    private String receiver;
+    private boolean isFragile;
     private double insuredAmount;
 
     private LogisticsOrder(Builder builder){
@@ -43,12 +43,15 @@ class LogisticsOrder{
 
     public static class Builder{
         private final String orderId;
-        private String sender;      // 寄件人
-        private String receiver;    // 收件人
-        private boolean isFragile;  // 是否易碎品
+        private String sender;
+        private String receiver;
+        private boolean isFragile;
         private double insuredAmount;
 
         public Builder(String orderId) {
+            if (orderId == null || orderId.isBlank()) {
+                throw new IllegalArgumentException("订单号不能为空");
+            }
             this.orderId = orderId;
         }
 
@@ -89,8 +92,8 @@ public class DesignPatternDemo {
         LogisticsConfig configB = LogisticsConfig.getInstance();
         System.out.println("单例测试：配置类实例A与实例B是否相同？ -> " + (configA == configB));
 
-        TransportVehicle drone = VehicleFactory.createVehicle("Drone");
-        System.out.println("工厂调度：工厂成功分配 -> 🚁无人机 [" + drone.vehicleId + "]，计费启动...");
+        TransportVehicle truck = VehicleFactory.createVehicle("Truck");
+        System.out.println("工厂调度：卡车 [" + truck.vehicleId + "]，配送费用：" + truck.calculateCost(10.0) + "元");
 
         LogisticsOrder order = new LogisticsOrder.Builder("OD-999")
                 .sender("Alice")

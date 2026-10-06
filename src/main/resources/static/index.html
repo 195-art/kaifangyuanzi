@@ -51,7 +51,7 @@
 <body>
   <div class="container">
 
-    <!-- 顶部 -->
+
     <div class="header">
       <h1>线上活动报名系统</h1>
       <div id="userInfo">
@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <!-- 筛选栏 -->
+
     <div style="margin-top:16px;display:flex;gap:10px;align-items:center;background:#fff;padding:12px;border-radius:10px;">
       <input id="kw" placeholder="搜索标题或描述" style="flex:1">
       <select id="st" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
@@ -76,10 +76,10 @@
 
     <div id="msg" class="msg"></div>
 
-    <!-- 活动列表 -->
-    <div class="event-list" id="eventList"></div>
 
-    <!-- 登录 / 注册弹层 -->
+    <div class="event-list" id="eventList"></div><div id="pagination" style="display:flex;gap:12px;align-items:center;justify-content:center;margin-top:16px"><button id="prevPage" onclick="changePage(-1)">上一页</button><span id="pageInfo"></span><button id="nextPage" onclick="changePage(1)">下一页</button></div>
+
+
     <div class="overlay" id="loginOverlay" onclick="if(event.target===this)hide('loginOverlay')">
       <div class="modal">
         <h2 id="loginTitle">登录</h2>
@@ -92,17 +92,17 @@
       </div>
     </div>
 
-    <!-- 发起活动弹层 -->
+
     <div class="overlay" id="createOverlay" onclick="if(event.target===this)hide('createOverlay')">
       <div class="modal">
-        <h2>发起新活动</h2>
+        <h2 id="eventFormTitle">发起新活动</h2><input id="cId" type="hidden">
         <div class="form-row"><label>标题</label><input id="cTitle"></div>
         <div class="form-row"><label>详细描述</label><textarea id="cDesc" rows="2"></textarea></div>
         <div class="form-row"><label>举办地点</label><input id="cLoc"></div>
-        <div class="form-row"><label>活动时间（格式：2026-12-01 10:00:00）</label><input id="cTime"></div>
+        <div class="form-row"><label>活动时间</label><input id="cTime" type="datetime-local" step="1"></div>
         <div class="form-row"><label>名额上限</label><input id="cCap" type="number" value="50"></div>
         <div style="display:flex;justify-content:flex-end;">
-          <button class="btn-primary" onclick="doCreate()">发起</button>
+          <button class="btn-primary" onclick="doCreate()">保存</button>
         </div>
       </div>
     </div>
@@ -110,146 +110,231 @@
   </div>
 
 <script>
-// ============ 通用工具 ============
 const TOKEN_KEY = 'token';
+let currentUser = null;
+let currentPage = 1;
+let totalPages = 1;
+let showingMine = false;
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
-function setToken(t) { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }
-function msg(s) { document.getElementById('msg').textContent = s || ''; }
+function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+function msg(text) { document.getElementById('msg').textContent = text || ''; }
 function show(id) { document.getElementById(id).classList.add('show'); }
 function hide(id) { document.getElementById(id).classList.remove('show'); }
 function val(id) { return document.getElementById(id).value.trim(); }
-function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-// 统一请求封装：自动带 token、自动存登录返回的 token、自动解析 JSON
-async function api(url, method, body) {
-  const headers = {};
-  if (body) headers['Content-Type'] = 'application/json';
-  const t = getToken();
-  if (t) headers['token'] = t;
-  const resp = await fetch(url, { method: method || 'GET', headers, body: body ? JSON.stringify(body) : undefined });
-  const tok = resp.headers.get('token');   // 登录成功时 token 在响应头里
-  if (tok) setToken(tok);
-  const data = await resp.json().catch(() => null);
-  return { status: resp.status, data };
+function esc(value) {
+  return (value == null ? '' : String(value)).replace(/[&<>"']/g,
+    c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
+function succeeded(result) { return result.status === 200 && result.data && result.data.code === 200; }
 
-// ============ 登录 / 注册（Q10 接口收的是参数，不是 JSON，所以放 URL 上）============
-function showLogin() { document.getElementById('loginTitle').textContent = '登录'; show('loginOverlay'); }
-
-async function doLogin() {
-  const u = val('loginUser'), p = val('loginPass');
-  if (!u || !p) { msg('请输入用户名和密码'); return; }
-  const r = await api('/Q10/auth/login?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), 'POST');
-  if (r.status === 200 && getToken()) {
-    hide('loginOverlay'); refreshHeader(); msg('登录成功'); loadEvents();
-  } else {
-    msg(r.data && r.data.message ? r.data.message : '登录失败');
+async function api(url, method = 'GET', body = null, useToken = true) {
+  const headers = {};
+  const token = useToken ? getToken() : null;
+  if (token) headers.token = token;
+  let payload;
+  if (body instanceof URLSearchParams) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    payload = body.toString();
+  } else if (body != null) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(body);
+  }
+  try {
+    const response = await fetch(url, {method, headers, body: payload});
+    const data = await response.json();
+    if (response.status === 200 && data.code === 200) {
+      const newToken = response.headers.get('token');
+      if (newToken) setToken(newToken);
+    }
+    if (response.status === 401 && token) {
+      setToken(null);
+      currentUser = null;
+      refreshHeader();
+    }
+    return {status: response.status, data};
+  } catch (e) {
+    return {status: 0, data: {message: '请求失败，请检查网络和服务'}};
   }
 }
 
-async function doRegister() {
-  const u = val('loginUser'), p = val('loginPass');
-  if (!u || !p) { msg('请输入用户名和密码'); return; }
-  const r = await api('/Q10/auth/register?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), 'POST');
-  if (r.status === 200) { msg('注册成功，自动登录中…'); doLogin(); }
-  else { msg(r.data && r.data.message ? r.data.message : '注册失败'); }
+function showLogin() { show('loginOverlay'); }
+
+async function doLogin() {
+  const username = val('loginUser');
+  const password = document.getElementById('loginPass').value;
+  if (!username || !password) { msg('请输入用户名和密码'); return; }
+  const result = await api('/Q10/auth/login', 'POST', new URLSearchParams({username, password}), false);
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  const user = await api('/Q10/auth/me');
+  if (!succeeded(user)) { msg(user.data.message); return; }
+  currentUser = user.data.data;
+  document.getElementById('loginPass').value = '';
+  hide('loginOverlay');
+  refreshHeader();
+  msg('登录成功');
+  await loadEvents();
 }
 
-function logout() { setToken(null); refreshHeader(); msg('已退出登录'); loadEvents(); }
+async function doRegister() {
+  const username = val('loginUser');
+  const password = document.getElementById('loginPass').value;
+  if (!username || !password) { msg('请输入用户名和密码'); return; }
+  const result = await api('/Q10/auth/register', 'POST', new URLSearchParams({username, password}), false);
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  await doLogin();
+}
+
+function logout() {
+  setToken(null);
+  currentUser = null;
+  refreshHeader();
+  msg('已退出登录');
+  loadEvents();
+}
 
 function refreshHeader() {
-  const has = !!getToken();
-  document.getElementById('btnLogin').style.display = has ? 'none' : 'inline-block';
-  document.getElementById('btnMine').style.display = has ? 'inline-block' : 'none';
-  document.getElementById('btnLogout').style.display = has ? 'inline-block' : 'none';
-  document.getElementById('btnCreate').style.display = has ? 'inline-block' : 'none';
-  document.getElementById('welcome').textContent = has ? '已登录' : '';
+  const loggedIn = currentUser != null;
+  document.getElementById('btnLogin').style.display = loggedIn ? 'none' : 'inline-block';
+  for (const id of ['btnMine', 'btnLogout', 'btnCreate']) {
+    document.getElementById(id).style.display = loggedIn ? 'inline-block' : 'none';
+  }
+  document.getElementById('welcome').textContent = loggedIn ? currentUser.username : '';
 }
 
-// ============ 活动列表（GET /Q11/event/list + keyword/status 筛选）============
-async function loadEvents() {
-  const kw = val('kw'), st = document.getElementById('st').value;
-  const url = '/Q11/event/list?page=1&size=100'
-    + (kw ? '&keyword=' + encodeURIComponent(kw) : '')
-    + (st ? '&status=' + encodeURIComponent(st) : '');
-  const r = await api(url);
-  if (r.status !== 200) { msg(r.data && r.data.message || '加载失败'); return; }
-  renderList(r.data.data.records);
+async function loadEvents(resetPage = true) {
+  showingMine = false;
+  if (resetPage) currentPage = 1;
+  const params = new URLSearchParams({page: currentPage, size: 10});
+  const keyword = val('kw');
+  const status = document.getElementById('st').value;
+  if (keyword) params.set('keyword', keyword);
+  if (status) params.set('status', status);
+  const result = await api('/Q11/event/list?' + params);
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  const page = result.data.data;
+  totalPages = Math.max(1, Math.ceil(page.total / page.size));
+  if (currentPage > totalPages) { currentPage = totalPages; return loadEvents(false); }
+  renderList(page.records);
+  document.getElementById('pagination').style.display = 'flex';
+  document.getElementById('pageInfo').textContent = currentPage + ' / ' + totalPages + ' 页，共 ' + page.total + ' 场活动';
+  document.getElementById('prevPage').disabled = currentPage <= 1;
+  document.getElementById('nextPage').disabled = currentPage >= totalPages;
+}
+
+function changePage(step) {
+  const next = currentPage + step;
+  if (next < 1 || next > totalPages) return;
+  currentPage = next;
+  loadEvents(false);
 }
 
 function renderList(records) {
   const box = document.getElementById('eventList');
-  if (!records || records.length === 0) { box.innerHTML = '<div class="empty">暂无活动</div>'; return; }
-  box.innerHTML = records.map(e => `
-    <div class="event-card">
-      <h3>${esc(e.title)}</h3>
-      <div class="meta">活动时间：${esc(e.eventTime)}</div>
-      <div class="meta">地点：${esc(e.location || '')}</div>
-      <div class="meta">${esc(e.description || '')}</div>
-      <div class="meta">发起人 #${esc(e.creatorId)} · 名额上限：${esc(e.capacity)}</div>
-      <span class="status-tag ${e.status === '即将开始' ? 'status-upcoming' : 'status-ended'}">${esc(e.status || '')}</span>
-      <div class="actions">
-        <button class="btn-primary" onclick="registerEvt(${e.id})">立即报名</button>
-        <button class="btn-danger" onclick="cancelEvt(${e.id})">取消报名</button>
-      </div>
-    </div>`).join('');
+  const list = (records || []).filter(Boolean);
+  if (!list.length) { box.innerHTML = '<div class="empty">暂无活动</div>'; return; }
+  box.innerHTML = list.map(event => {
+    let actions = '';
+    if (currentUser) {
+      if (event.status === '即将开始' && !showingMine) actions += '<button class="btn-primary" onclick="registerEvt(' + event.id + ')">立即报名</button>';
+      actions += '<button class="btn-danger" onclick="cancelEvt(' + event.id + ')">取消报名</button>';
+      if (String(event.creatorId) === String(currentUser.id)) {
+        actions += '<button class="btn-green" onclick="editEvt(' + event.id + ')">修改活动</button>';
+        actions += '<button class="btn-danger" onclick="deleteEvt(' + event.id + ')">删除活动</button>';
+      }
+    }
+    return '<div class="event-card"><h3>' + esc(event.title) + '</h3>'
+      + '<div class="meta">活动时间：' + esc(event.eventTime) + '</div>'
+      + '<div class="meta">地点：' + esc(event.location) + '</div>'
+      + '<div class="meta">' + esc(event.description) + '</div>'
+      + '<div class="meta">发起人 #' + esc(event.creatorId) + ' · 名额上限：' + esc(event.capacity) + '</div>'
+      + '<span class="status-tag ' + (event.status === '即将开始' ? 'status-upcoming' : 'status-ended') + '">' + esc(event.status) + '</span>'
+      + '<div class="actions">' + actions + '</div></div>';
+  }).join('');
 }
 
-// ============ 发起活动（POST /Q11/event，需要登录）============
 function showCreate() {
-  if (!getToken()) { msg('请先登录'); return; }
+  if (!currentUser) { msg('请先登录'); return; }
+  for (const id of ['cId', 'cTitle', 'cDesc', 'cLoc', 'cTime']) document.getElementById(id).value = '';
+  document.getElementById('cCap').value = 50;
+  document.getElementById('eventFormTitle').textContent = '发起新活动';
+  show('createOverlay');
+}
+
+async function editEvt(id) {
+  const result = await api('/Q11/event/' + id);
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  const event = result.data.data;
+  document.getElementById('cId').value = event.id;
+  document.getElementById('cTitle').value = event.title;
+  document.getElementById('cDesc').value = event.description || '';
+  document.getElementById('cLoc').value = event.location || '';
+  document.getElementById('cTime').value = (event.eventTime || '').replace(' ', 'T');
+  document.getElementById('cCap').value = event.capacity;
+  document.getElementById('eventFormTitle').textContent = '修改活动';
   show('createOverlay');
 }
 
 async function doCreate() {
-  const body = {
-    title: val('cTitle'), description: val('cDesc'), location: val('cLoc'),
-    eventTime: val('cTime'), capacity: parseInt(val('cCap')) || 50
-  };
+  const capacity = Number(val('cCap'));
+  let eventTime = val('cTime').replace('T', ' ');
+  if (eventTime.length === 16) eventTime += ':00';
+  const body = {title: val('cTitle'), description: val('cDesc'), location: val('cLoc'), eventTime, capacity};
   if (!body.title || !body.eventTime) { msg('标题和活动时间必填'); return; }
-  const r = await api('/Q11/event', 'POST', body);
-  if (r.status === 200) { hide('createOverlay'); msg('活动发起成功！'); loadEvents(); }
-  else { msg(r.data && r.data.message || '发起失败'); }
+  if (!Number.isInteger(capacity) || capacity < 1) { msg('名额必须为正整数'); return; }
+  const id = val('cId');
+  const result = await api('/Q11/event' + (id ? '/' + id : ''), id ? 'PUT' : 'POST', body);
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  hide('createOverlay');
+  msg(id ? '活动修改成功' : '活动发起成功');
+  await loadEvents();
 }
 
-// ============ 报名 / 取消报名（POST/DELETE /Q11/registration/{id}，需要登录）============
+async function deleteEvt(id) {
+  if (!confirm('确定删除这场活动吗？')) return;
+  const result = await api('/Q11/event/' + id, 'DELETE');
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  msg('活动已删除');
+  await loadEvents(false);
+}
+
 async function registerEvt(id) {
-  if (!getToken()) { msg('请先登录'); return; }
-  const r = await api('/Q11/registration/' + id, 'POST');
-  msg(r.status === 200 ? '报名成功！' : (r.data && r.data.message || '报名失败'));
-  loadEvents();
+  if (!currentUser) { msg('请先登录'); return; }
+  const result = await api('/Q11/registration/' + id, 'POST');
+  msg(succeeded(result) ? '报名成功' : result.data.message);
+  await loadEvents(false);
 }
 
 async function cancelEvt(id) {
-  if (!getToken()) { msg('请先登录'); return; }
-  const r = await api('/Q11/registration/' + id, 'DELETE');
-  msg(r.status === 200 ? '已取消报名' : (r.data && r.data.message || '取消失败'));
-  loadEvents();
+  if (!currentUser) { msg('请先登录'); return; }
+  const result = await api('/Q11/registration/' + id, 'DELETE');
+  msg(succeeded(result) ? '已取消报名' : result.data.message);
+  if (showingMine) await loadMine();
+  else await loadEvents(false);
 }
 
-// ============ 我的报名（GET /Q11/registration/mine）============
 async function loadMine() {
-  if (!getToken()) { msg('请先登录'); return; }
-  const r = await api('/Q11/registration/mine');
-  if (r.status !== 200) { msg(r.data && r.data.message || '加载失败'); return; }
-  const list = r.data.data || [];
-  const box = document.getElementById('eventList');
-  if (!list.length) { box.innerHTML = '<div class="empty">你还没有报名任何活动</div>'; return; }
-  box.innerHTML = list.map(e => `
-    <div class="event-card">
-      <h3>${esc(e.title)}</h3>
-      <div class="meta">活动时间：${esc(e.eventTime)}</div>
-      <div class="actions">
-        <button class="btn-danger" onclick="cancelEvt(${e.id})">取消报名</button>
-      </div>
-    </div>`).join('');
+  if (!currentUser) { msg('请先登录'); return; }
+  const result = await api('/Q11/registration/mine');
+  if (!succeeded(result)) { msg(result.data.message); return; }
+  showingMine = true;
+  document.getElementById('pagination').style.display = 'none';
+  renderList(result.data.data);
 }
 
-// ============ 页面加载 ============
-refreshHeader();
-loadEvents();
+async function initialize() {
+  if (getToken()) {
+    const result = await api('/Q10/auth/me');
+    if (succeeded(result)) currentUser = result.data.data;
+  }
+  refreshHeader();
+  await loadEvents();
+}
+
+initialize();
 </script>
 </body>
 </html>

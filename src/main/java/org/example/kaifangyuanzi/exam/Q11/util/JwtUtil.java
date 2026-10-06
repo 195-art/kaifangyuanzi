@@ -21,7 +21,7 @@ public class JwtUtil {
     public String generateToken(String username){
         HashMap<String,Object> claims = new HashMap<>();
         claims.put("username",username);
-        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
+        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return Jwts.builder().claims(claims)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expire))
@@ -31,7 +31,7 @@ public class JwtUtil {
 
     public boolean validateToken(String token){
         try {
-            SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
+            SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             Claims claims = Jwts.parser()
                     .verifyWith(key)
                     .build()
@@ -46,7 +46,7 @@ public class JwtUtil {
     }
 
     public String getUsername(String token){
-        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes());
+        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         return Jwts.parser()
                 .verifyWith(key)
                 .build()

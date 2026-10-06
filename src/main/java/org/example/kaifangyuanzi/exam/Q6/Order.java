@@ -34,11 +34,8 @@ public class Order implements Comparable<Order>{
 
     @Override
     public int compareTo(Order o) {
-        if(Double.compare(this.amount,o.amount)==0){
-            return Double.compare(o.amount,this.amount);
-        }else {
-            return this.orderId.compareTo(o.orderId);
-        }
+        int result = Double.compare(o.amount, this.amount);
+        return result != 0 ? result : this.orderId.compareTo(o.orderId);
     }
 
     @Override

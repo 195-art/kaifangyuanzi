@@ -27,6 +27,7 @@ public class MyArrayList <T>{
 
     public T get(int index){
         if(index >= size || index < 0){
+            System.out.println("索引越界：" + index);
             return null;
         }
         return (T)elements[index];
@@ -34,6 +35,7 @@ public class MyArrayList <T>{
 
     public void remove(int index){
         if(index >= size || index < 0){
+            System.out.println("索引越界：" + index);
             return;
         }
         T removed =  (T)elements[index];

@@ -1,34 +1,56 @@
 package org.example.kaifangyuanzi.exam.Q11.config;
 
+import org.example.kaifangyuanzi.exam.Q11.common.PageResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
+import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.cache.interceptor.KeyGenerator;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.*;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.serializer.RedisSerializationContext;
-import org.springframework.data.redis.serializer.RedisSerializer;
-
+import org.springframework.data.redis.serializer.*;
 import java.time.Duration;
+import java.time.LocalDateTime;
 
-// Redis 缓存配置：自定义 CacheManager
 @Configuration("q11RedisCacheConfig")
-public class RedisCacheConfig {
+public class RedisCacheConfig implements CachingConfigurer {
+    private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);
+
+    @Bean
+    public KeyGenerator eventListKeyGenerator(ObjectMapper mapper) {
+        return (target, method, params) -> mapper.writeValueAsString(params);
+    }
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {
-        // RedisSerializer.json()：Spring Data Redis 4 官方推荐的 JSON 序列化器（基于 Jackson 3）
-        // 默认就带类型信息（@class 字段），读出来能还原成 PageResult/Event 对象；
-        // Jackson 3 原生支持 LocalDateTime（Event.eventTime 就是这类型），无需再手动配置 ObjectMapper
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                // 缓存 30 分钟自动过期，防止旧数据一直不更新
-                .entryTtl(Duration.ofMinutes(30))
-                // 用 JSON 格式存进 Redis（默认的 JDK 序列化要求类实现 Serializable，容易踩坑）
-                .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(RedisSerializer.json()));
+                .entryTtl((key, value) -> {
+                    Duration ttl = Duration.ofMinutes(1);
+                    if (value instanceof PageResult<?> page && page.getExpiresAt() != null) {
+                        Duration remaining = Duration.between(LocalDateTime.now(), page.getExpiresAt());
+                        if (remaining.isNegative() || remaining.isZero()) return Duration.ofMillis(1);
+                        if (remaining.compareTo(ttl) < 0) ttl = remaining;
+                    }
+                    return ttl;
+                })
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.json()));
+        return RedisCacheManager.builder(factory).cacheDefaults(config).transactionAware().build();
+    }
 
-        return RedisCacheManager.builder(factory)
-                .cacheDefaults(config)
-                .build();
+    @Bean
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            public void handleCacheGetError(RuntimeException e, Cache cache, Object key) { failed(cache); }
+            public void handleCachePutError(RuntimeException e, Cache cache, Object key, Object value) { failed(cache); }
+            public void handleCacheEvictError(RuntimeException e, Cache cache, Object key) { failed(cache); }
+            public void handleCacheClearError(RuntimeException e, Cache cache) { failed(cache); }
+            private void failed(Cache cache) { log.warn("缓存 {} 暂不可用", cache.getName()); }
+        };
     }
 }

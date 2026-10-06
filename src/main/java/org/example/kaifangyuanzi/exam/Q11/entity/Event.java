@@ -23,7 +23,10 @@ public class Event {
     private LocalDateTime createTime;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
-
-    // 动态计算的状态（不存数据库）：即将开始 / 已结束
     private String status;
+
+    public String getStatus() {
+        if (eventTime == null) return null;
+        return eventTime.isAfter(LocalDateTime.now()) ? "即将开始" : "已结束";
+    }
 }

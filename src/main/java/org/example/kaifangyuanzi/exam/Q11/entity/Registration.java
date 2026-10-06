@@ -13,5 +13,5 @@ public class Registration {
     private Long userId;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private Date registrationDate;
+    private Date registerTime;
 }
