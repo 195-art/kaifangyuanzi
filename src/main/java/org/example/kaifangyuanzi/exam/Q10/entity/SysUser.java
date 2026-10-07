@@ -2,10 +2,17 @@ package org.example.kaifangyuanzi.exam.Q10.entity;
 
 import java.util.Date;
 
+/**
+ * 系统用户实体类
+ */
 public class SysUser {
+    /** 用户id */
     private Long id;
+    /** 用户名 */
     private String username;
+    /** 密码 */
     private String password;
+    /** 注册日期 */
     private Date registerDate;
 
     public Long getId() {

@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import io.jsonwebtoken.JwtException;
 
+/**
+ * 认证接口
+ */
 @RestController
 @RequestMapping("/Q10/auth")
 public class AuthController {
@@ -23,16 +26,30 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    /**
+     * 用户注册
+     * @param username
+     * @param password
+     * @return
+     */
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<String>> register(@RequestParam String username, @RequestParam String password) {
         String result = userService.register(username, password);
         return result.equals("注册成功") ? success(result) : ResponseEntity.badRequest().body(ApiResponse.error(400, result));
     }
 
+    /**
+     * 用户登录
+     * @param username
+     * @param password
+     * @param token
+     * @return
+     */
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<String>> login(
             @RequestParam(required = false) String username, @RequestParam(required = false) String password,
             @RequestHeader(value = "token", required = false) String token) {
+        //用户名密码登录
         if (username != null || password != null) {
             String result = userService.loginByPassword(username, password);
             if (!result.startsWith("eyJ")) return ResponseEntity.status(401).body(ApiResponse.error(401, result));
@@ -40,27 +57,41 @@ public class AuthController {
             body.setMessage("登录成功");
             return ResponseEntity.ok().header("token", result).body(body);
         }
+        //token登录
         String result = userService.loginByToken(token);
         return result.equals("登录成功") ? success(result) : ResponseEntity.status(401).body(ApiResponse.error(401, result));
     }
 
+    /**
+     * 获取当前登录用户信息
+     * @param token
+     * @return
+     */
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<Map<String, Object>>> me(@RequestHeader(value = "token", required = false) String token) {
+        //校验token是否为空
         if (token == null || token.isBlank()) {
             return ResponseEntity.status(401).body(ApiResponse.error(401, "请重新登录"));
         }
         String username;
         try {
+            //从token中解析用户名
             username = jwtUtil.getUsername(token);
         } catch (JwtException | IllegalArgumentException e) {
             return ResponseEntity.status(401).body(ApiResponse.error(401, "请重新登录"));
         }
         if (username == null || username.isBlank()) return ResponseEntity.status(401).body(ApiResponse.error(401, "请重新登录"));
+        //根据用户名查询用户
         SysUser user = userMapper.selectByUsername(username);
         if (user == null) return ResponseEntity.status(401).body(ApiResponse.error(401, "登录用户不存在"));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("id", user.getId(), "username", user.getUsername())));
     }
 
+    /**
+     * 构造成功响应
+     * @param message
+     * @return
+     */
     private ResponseEntity<ApiResponse<String>> success(String message) {
         ApiResponse<String> body = ApiResponse.ok(message);
         body.setMessage(message);

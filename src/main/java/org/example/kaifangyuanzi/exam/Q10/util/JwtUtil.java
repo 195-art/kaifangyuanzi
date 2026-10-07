@@ -11,6 +11,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * JWT工具类
+ */
 @Component
 public class JwtUtil {
     @Value("${jwt.secret}")
@@ -19,6 +22,11 @@ public class JwtUtil {
     @Value("${jwt.expire}")
     private long expire;
 
+    /**
+     * 生成token
+     * @param username
+     * @return
+     */
     public String generateToken(String username){
         HashMap<String,Object> claims = new HashMap<>();
         claims.put("username",username);
@@ -30,6 +38,11 @@ public class JwtUtil {
                 .compact();
     }
 
+    /**
+     * 校验token是否有效
+     * @param token
+     * @return
+     */
     public boolean validateToken(String token){
         try {
             SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -46,6 +59,11 @@ public class JwtUtil {
 
     }
 
+    /**
+     * 从token中获取用户名
+     * @param token
+     * @return
+     */
     public String getUsername(String token) {
         return Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
                 .build().parseSignedClaims(token).getPayload().get("username", String.class);

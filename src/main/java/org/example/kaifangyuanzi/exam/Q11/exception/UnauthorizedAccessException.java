@@ -1,5 +1,8 @@
 package org.example.kaifangyuanzi.exam.Q11.exception;
 
+/**
+ * 无权限访问异常
+ */
 public class UnauthorizedAccessException extends RuntimeException {
 
     public UnauthorizedAccessException() {

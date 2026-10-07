@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 
+/**
+ * 活动服务实现类
+ */
 @Service
 public class EventServiceImpl implements EventService {
     private final EventMapper eventMapper;
@@ -28,12 +31,22 @@ public class EventServiceImpl implements EventService {
         this.registrationMapper = registrationMapper;
     }
 
+    /**
+     * 分页查询活动列表
+     * @param page
+     * @param size
+     * @param keyword
+     * @param status
+     * @return
+     */
     @Override
     @Cacheable(cacheNames = "eventList", keyGenerator = "eventListKeyGenerator")
     public PageResult<Event> listEvents(int page, int size, String keyword, String status) {
+        //校验分页参数
         if (page < 1 || size < 1 || size > 100) throw new BusinessException("页码必须大于0，每页数量必须在1到100之间");
         keyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
         status = status == null || status.isBlank() ? null : status.trim();
+        //校验活动状态是否有效
         if (status != null && !status.equals("即将开始") && !status.equals("已结束")) {
             throw new BusinessException("活动状态无效");
         }
@@ -46,6 +59,11 @@ public class EventServiceImpl implements EventService {
         return result;
     }
 
+    /**
+     * 根据id查询活动详情
+     * @param id
+     * @return
+     */
     @Override
     public Event getEvent(Long id) {
         Event event = eventMapper.selectById(id);
@@ -53,26 +71,41 @@ public class EventServiceImpl implements EventService {
         return event;
     }
 
+    /**
+     * 新增活动
+     * @param event
+     * @return
+     */
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @CacheEvict(cacheNames = "eventList", allEntries = true)
     public Event createEvent(Event event) {
         validate(event);
         event.setId(null);
+        //设置创建人为当前登录用户
         event.setCreatorId(getCurrentUserId());
         eventMapper.insert(event);
         return eventMapper.selectById(event.getId());
     }
 
+    /**
+     * 修改活动
+     * @param id
+     * @param event
+     * @return
+     */
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @CacheEvict(cacheNames = "eventList", allEntries = true)
     public Event updateEvent(Long id, Event event) {
         validate(event);
         Long userId = getCurrentUserId();
+        //查询原活动信息并加锁
         Event existing = eventMapper.selectByIdForUpdate(id);
         if (existing == null) throw new EventNotFoundException();
+        //校验是否为活动创建人
         if (!existing.getCreatorId().equals(userId)) throw new UnauthorizedAccessException();
+        //校验名额不能少于已报名人数
         if (event.getCapacity() < registrationMapper.countByEvent(id)) {
             throw new BusinessException("名额不能少于已报名人数");
         }
@@ -81,18 +114,29 @@ public class EventServiceImpl implements EventService {
         return eventMapper.selectById(id);
     }
 
+    /**
+     * 删除活动
+     * @param id
+     */
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @CacheEvict(cacheNames = "eventList", allEntries = true)
     public void deleteEvent(Long id) {
         Long userId = getCurrentUserId();
+        //查询活动信息并加锁
         Event existing = eventMapper.selectByIdForUpdate(id);
         if (existing == null) throw new EventNotFoundException();
+        //校验是否为活动创建人
         if (!existing.getCreatorId().equals(userId)) throw new UnauthorizedAccessException();
+        //先删除该活动的所有报名记录，再删除活动
         registrationMapper.deleteByEvent(id);
         eventMapper.deleteById(id);
     }
 
+    /**
+     * 校验活动参数
+     * @param event
+     */
     private void validate(Event event) {
         if (event == null || event.getTitle() == null || event.getTitle().isBlank()) throw new BusinessException("活动标题不能为空");
         if (event.getTitle().length() > 100) throw new BusinessException("活动标题不能超过100字");
@@ -101,9 +145,15 @@ public class EventServiceImpl implements EventService {
         if (event.getCapacity() == null || event.getCapacity() <= 0) throw new BusinessException("名额必须大于0");
     }
 
+    /**
+     * 获取当前登录用户id
+     * @return
+     */
     private Long getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        //校验是否已登录
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) throw new UnauthorizedAccessException("请先登录");
+        //根据用户名查询用户
         SysUser user = userMapper.selectByUsername(auth.getName());
         if (user == null) throw new UnauthorizedAccessException("登录用户不存在");
         return user.getId();

@@ -9,12 +9,27 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+/**
+ * 安全配置类
+ */
 @Configuration
 public class SecurityConfig {
+
+    /**
+     * 密码加密器
+     * @return
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+
+    /**
+     * 安全过滤器链
+     * @param http
+     * @return
+     * @throws Exception
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
@@ -24,5 +39,5 @@ public class SecurityConfig {
                         .anyRequest().permitAll());
         return http.build();
     }
-    
+
 }

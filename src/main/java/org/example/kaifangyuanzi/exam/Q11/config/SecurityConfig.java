@@ -12,6 +12,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 安全配置类
+ */
 @Configuration("q11SecurityConfig")
 @EnableWebSecurity
 public class SecurityConfig {
@@ -23,6 +26,12 @@ public class SecurityConfig {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 安全过滤器链
+     * @param http
+     * @return
+     * @throws Exception
+     */
     @Bean
     @Order(-100)
     public SecurityFilterChain q11SecurityFilterChain(HttpSecurity http) throws Exception {
@@ -32,11 +41,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.GET, "/Q11/event/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
+                        //未登录处理
                         .authenticationEntryPoint((request, response, e) -> {
                             response.setStatus(401);
                             response.setContentType("application/json;charset=UTF-8");
                             response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(401, "请先登录")));
                         })
+                        //无权限处理
                         .accessDeniedHandler((request, response, e) -> {
                             response.setStatus(403);
                             response.setContentType("application/json;charset=UTF-8");
@@ -46,6 +57,10 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * 注册JWT过滤器（禁用自动注册，避免重复执行）
+     * @return
+     */
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration() {
         FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(jwtAuthenticationFilter);

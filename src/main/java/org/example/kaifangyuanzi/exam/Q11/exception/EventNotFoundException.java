@@ -1,5 +1,8 @@
 package org.example.kaifangyuanzi.exam.Q11.exception;
 
+/**
+ * 活动不存在异常
+ */
 public class EventNotFoundException extends RuntimeException{
 
     public EventNotFoundException() {

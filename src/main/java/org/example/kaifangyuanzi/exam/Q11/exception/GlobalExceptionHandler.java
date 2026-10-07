@@ -13,28 +13,51 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+/**
+ * 全局异常处理器
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * 处理活动不存在异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(EventNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleEventNotFound(EventNotFoundException e) {
         return ApiResponse.error(404, e.getMessage());
     }
 
+    /**
+     * 处理无权限访问异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(UnauthorizedAccessException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleUnauthorized(UnauthorizedAccessException e) {
         return ApiResponse.error(403, e.getMessage());
     }
 
+    /**
+     * 处理业务异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusiness(BusinessException e) {
         return ApiResponse.error(400, e.getMessage());
     }
 
+    /**
+     * 处理请求参数异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class,
             HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, IllegalArgumentException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -42,12 +65,22 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, "请求参数不正确");
     }
 
+    /**
+     * 处理请求方法不支持异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ApiResponse<Void> handleMethod(Exception e) {
         return ApiResponse.error(405, "请求方法不支持");
     }
 
+    /**
+     * 处理数据库访问异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(DataAccessException.class)
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ApiResponse<Void> handleDatabase(DataAccessException e) {
@@ -55,18 +88,33 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(503, "数据库暂不可用");
     }
 
+    /**
+     * 处理接口不存在异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleMissingResource(Exception e) {
         return ApiResponse.error(404, "接口不存在");
     }
 
+    /**
+     * 处理请求内容类型不支持异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
     public ApiResponse<Void> handleContentType(Exception e) {
         return ApiResponse.error(415, "请求内容类型不支持");
     }
 
+    /**
+     * 处理未知异常
+     * @param e
+     * @return
+     */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception e) {
